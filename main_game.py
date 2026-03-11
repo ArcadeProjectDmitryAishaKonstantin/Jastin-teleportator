@@ -6,7 +6,7 @@ from arcade.camera import Camera2D
 
 SCREEN_WIDTH = 1000
 SCREEN_HEIGHT = 600
-SCREEN_TITLE = "Герой против монстров — меню"
+SCREEN_TITLE = "Джастин - телепортатор — меню"
 
 GAME_WIDTH = 1400
 GAME_HEIGHT = 750
@@ -27,7 +27,6 @@ class FaceDirection(enum.Enum):
     RIGHT = 1
 
 
-#-------------------Уровень 3----------------------
 class Hero(arcade.Sprite):
     def __init__(self):
         super().__init__()
