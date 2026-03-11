@@ -731,3 +731,467 @@ class MyGame(arcade.Window):
 
 
 # ----------------------Уровень 1 ------------------------- #
+
+WINDOW_WIDTH = 1000
+WINDOW_HEIGHT = 600
+WINDOW_CAPTION = "Джастин - телепортатор — меню"
+
+PLAY_AREA_WIDTH = 1400
+PLAY_AREA_HEIGHT = 750
+
+MAP_WIDTH = 3000
+MAP_HEIGHT = 750
+
+GAME_CAPTION = "Спрайтовый герой"
+ENEMY_SPAWN_RATE = 0.7
+
+CAMERA_SMOOTHING = 0.12
+
+
+class Orientation(enum.Enum):
+    LEFT = 0
+    RIGHT = 1
+
+
+class Player(arcade.Sprite):
+    """Герой с физикой как в первом файле (ручное управление, гравитация, коллизии)."""
+
+    def __init__(self):
+        super().__init__()
+
+        self.scale = 1.0
+        self.movement_speed = 300
+        self.hit_points = 100
+        self.max_hit_points = 100
+
+        self.stationary_texture = arcade.load_texture(
+            ":resources:/images/animated_characters/male_person/malePerson_idle.png")
+        self.texture = self.stationary_texture
+
+        self.moving_textures = []
+        for i in range(0, 8):
+            texture = arcade.load_texture(
+                f":resources:/images/animated_characters/male_person/malePerson_walk{i}.png")
+            self.moving_textures.append(texture)
+
+        self.current_frame = 0
+        self.frame_timer = 0
+        self.frame_delay = 0.1
+
+        self.is_moving = False
+        self.facing = Orientation.RIGHT
+
+        self.center_x = 100
+        self.center_y = 130
+
+        self.vertical_velocity = 0
+        self.gravity_force = 0.5
+        self.jump_force = 12
+        self.can_jump_flag = True
+
+        self.is_active = True
+
+        # Время неуязвимости после получения урона
+        self.invulnerability_timer = 0
+        self.invulnerability_period = 1.0
+        self.damage_effect_timer = 0
+
+        self.game_ref = None
+
+    def update_animation(self, delta_time: float = 1 / 60):
+        if not self.is_active:
+            return
+
+        # Обновление времени неуязвимости
+        if self.invulnerability_timer > 0:
+            self.invulnerability_timer -= delta_time
+            self.damage_effect_timer += delta_time
+        else:
+            self.damage_effect_timer = 0
+
+        if self.is_moving:
+            self.frame_timer += delta_time
+            if self.frame_timer >= self.frame_delay:
+                self.frame_timer = 0
+                self.current_frame += 1
+                if self.current_frame >= len(self.moving_textures):
+                    self.current_frame = 0
+                if self.facing == Orientation.RIGHT:
+                    self.texture = self.moving_textures[self.current_frame]
+                else:
+                    self.texture = self.moving_textures[self.current_frame].flip_horizontally()
+        else:
+            if self.facing == Orientation.RIGHT:
+                self.texture = self.stationary_texture
+            else:
+                self.texture = self.stationary_texture.flip_horizontally()
+
+    def update(self, delta_time, pressed_keys):
+        if not self.is_active:
+            return
+
+        # 1. Вычисляем желаемое перемещение от клавиш
+        dx, dy = 0, 0
+        if arcade.key.LEFT in pressed_keys or arcade.key.A in pressed_keys:
+            dx -= self.movement_speed * delta_time
+        if arcade.key.RIGHT in pressed_keys or arcade.key.D in pressed_keys:
+            dx += self.movement_speed * delta_time
+
+        # 2. Гравитация
+        self.vertical_velocity -= self.gravity_force
+
+        # 3. Прыжок
+        if arcade.key.SPACE in pressed_keys and self.can_jump_flag:
+            self.vertical_velocity = self.jump_force
+            self.can_jump_flag = False
+
+        dy = self.vertical_velocity
+
+        # 4. Коррекция диагонального движения
+        if dx != 0 and dy != 0:
+            factor = 0.7071
+            dx *= factor
+            dy *= factor
+
+        # 5. Движение по X с проверкой коллизий
+        old_x = self.center_x
+        self.center_x += dx
+        if self.game_ref:
+            # Горизонтальные столкновения
+            hit_list = arcade.check_for_collision_with_list(self, self.game_ref.obstacle_list)
+            if hit_list:
+                self.center_x = old_x
+
+        # 6. Движение по Y с проверкой коллизий
+        old_y = self.center_y
+        self.center_y += dy
+        if self.game_ref:
+            # Вертикальные столкновения
+            hit_list = arcade.check_for_collision_with_list(self, self.game_ref.obstacle_list)
+            if hit_list:
+                # Определяем направление движения
+                if dy > 0:  # движение вверх
+                    # Корректируем позицию так, чтобы верх персонажа не заходил в платформу
+                    for platform in hit_list:
+                        if self.top > platform.bottom:
+                            self.top = platform.bottom - 1
+                    self.vertical_velocity = 0
+                elif dy < 0:  # движение вниз
+                    # Корректируем позицию так, чтобы низ персонажа стоял на платформе
+                    for platform in hit_list:
+                        if self.bottom < platform.top:
+                            self.bottom = platform.top + 1
+                            self.can_jump_flag = True
+                    self.vertical_velocity = 0
+            else:
+                # Если нет коллизий при движении вниз, то мы в воздухе
+                if dy < 0:
+                    self.can_jump_flag = False
+
+        # 7. Ограничение границами мира
+        self.center_x = max(self.width / 2, min(MAP_WIDTH - self.width / 2, self.center_x))
+        self.center_y = max(self.height / 2, min(MAP_HEIGHT - self.height / 2, self.center_y))
+
+        # 8. Направление и анимация ходьбы
+        if dx < 0:
+            self.facing = Orientation.LEFT
+        elif dx > 0:
+            self.facing = Orientation.RIGHT
+
+        self.is_moving = dx != 0
+
+    def receive_damage(self, damage_amount):
+        if self.invulnerability_timer <= 0 and self.is_active:
+            self.hit_points -= damage_amount
+            self.invulnerability_timer = self.invulnerability_period
+            if self.hit_points <= 0:
+                self.hit_points = 0
+                self.is_active = False
+            return True
+        return False
+
+
+class Projectile(arcade.Sprite):
+    """Пуля, летящая в сторону курсора."""
+
+    def __init__(self, start_x, start_y, target_x, target_y, projectile_speed=800, impact_damage=10):
+        super().__init__()
+        self.texture = arcade.load_texture(":resources:/images/space_shooter/laserBlue01.png")
+        self.center_x = start_x
+        self.center_y = start_y
+        self.projectile_speed = projectile_speed
+        self.impact_damage = impact_damage
+
+        x_diff = target_x - start_x
+        y_diff = target_y - start_y
+        angle = math.atan2(y_diff, x_diff)
+        self.change_x = math.cos(angle) * projectile_speed
+        self.change_y = math.sin(angle) * projectile_speed
+        self.angle = math.degrees(-angle)
+
+    def update(self, delta_time):
+        if (self.center_x < -100 or self.center_x > MAP_WIDTH + 100 or
+                self.center_y < -100 or self.center_y > MAP_HEIGHT + 100):
+            self.remove_from_sprite_lists()
+        self.center_x += self.change_x * delta_time
+        self.center_y += self.change_y * delta_time
+
+
+class EnemyBee(arcade.Sprite):
+    """Пчела, которая летает за игроком."""
+
+    def __init__(self, target_player):
+        super().__init__()
+        self.target_player = target_player
+
+        self.original_bee_texture = arcade.load_texture(":resources:images/enemies/bee.png")
+        self.mirrored_bee_texture = self.original_bee_texture.flip_horizontally()
+        self.texture = self.original_bee_texture
+        self.scale = 0.4
+
+        self.center_x = random.randint(50, MAP_WIDTH - 50)
+        self.center_y = MAP_HEIGHT + 50
+
+        self.flying_speed = 375
+
+    def update(self, delta_time):
+        if not self.target_player or not self.target_player.is_active:
+            return
+
+        dx = self.target_player.center_x - self.center_x
+        dy = self.target_player.center_y - self.center_y
+        distance = math.hypot(dx, dy)
+        if distance > 0:
+            self.center_x += (dx / distance) * self.flying_speed * delta_time
+            self.center_y += (dy / distance) * self.flying_speed * delta_time
+
+            if dx > 0:
+                self.texture = self.mirrored_bee_texture
+            else:
+                self.texture = self.original_bee_texture
+
+
+class GameLevel3(arcade.Window):
+    def __init__(self, width, height, title):
+        super().__init__(width, height, title)
+        arcade.set_background_color(arcade.color.BARN_RED)
+
+        self.world_view = Camera2D()
+        self.ui_view = Camera2D()
+        self.victory_sound = arcade.load_sound(":resources:/sounds/upgrade1.wav")
+
+    def initialize_level(self):
+        self.character_list = arcade.SpriteList()
+        self.ground_list = arcade.SpriteList()
+        self.crate_list = arcade.SpriteList()
+        self.shot_list = arcade.SpriteList()
+        self.enemy_list = arcade.SpriteList()
+
+        self.main_character = Player()
+        self.main_character.game_ref = self  # даём ссылку на игру для доступа к platforms_list
+        self.character_list.append(self.main_character)
+
+        self.fire_sound = arcade.load_sound(":resources:/sounds/laser1.wav")
+        self.impact_sound = arcade.load_sound(":resources:/sounds/hit1.wav")
+        self.defeat_sound = arcade.load_sound(":resources:/sounds/gameover1.wav")
+        self.collect_sound = arcade.load_sound(":resources:/sounds/coin1.wav")
+
+        self.active_keys = set()
+
+        # Платформы
+        for x in range(0, MAP_WIDTH, 64):
+            ground_tile = arcade.Sprite(":resources:images/tiles/grassMid.png", 0.5)
+            ground_tile.center_x = x
+            ground_tile.center_y = 32
+            self.ground_list.append(ground_tile)
+
+        crate_positions = []
+        for x in range(900, 1900, 64):
+            crate_positions.append((x, 100))
+        for x in range(964, 1836, 64):
+            crate_positions.append((x, 164))
+
+        for x, y in crate_positions:
+            crate = arcade.Sprite(":resources:/images/tiles/boxCrate_double.png", 0.5)
+            crate.center_x = x
+            crate.center_y = y
+            self.crate_list.append(crate)
+
+        self.obstacle_list = arcade.SpriteList()
+        self.obstacle_list.extend(self.ground_list)
+        self.obstacle_list.extend(self.crate_list)
+
+        self.enemy_spawn_clock = 0.0
+        self.player_score = 0
+        self.current_game_state = "PLAYING"
+        self.game_over_audio_played = False
+
+        self.victory_target = 50
+        self.defeated_enemies = 0
+
+        # Номер уровня
+        self.level_number = 1
+
+    def on_draw(self):
+        self.clear()
+        self.world_view.use()
+        self.ground_list.draw()
+        self.crate_list.draw()
+        self.character_list.draw()
+        self.shot_list.draw()
+        self.enemy_list.draw()
+        self.ui_view.use()
+
+        arcade.draw_text(f"Счёт: {self.player_score}", 10, self.height - 30,
+                         arcade.color.WHITE, 20)
+
+        remaining = max(0, self.victory_target - self.defeated_enemies)
+        arcade.draw_text(f"Осталось пчёл: {remaining}", 10, self.height - 60,
+                         arcade.color.WHITE, 20)
+
+        if self.current_game_state == "GAME_OVER":
+            arcade.draw_lrbt_rectangle_filled(0, self.width, 0, self.height,
+                                              (0, 0, 0, 180))
+            arcade.draw_text("GAME OVER", self.width // 2, self.height // 2 + 50,
+                             arcade.color.RED, 50, anchor_x="center")
+            arcade.draw_text(f"Final Score: {self.player_score}", self.width // 2, self.height // 2,
+                             arcade.color.WHITE, 30, anchor_x="center")
+            arcade.draw_text("Press R to Restart or ESC to Exit", self.width // 2,
+                             self.height // 2 - 50, arcade.color.YELLOW, 20, anchor_x="center")
+
+        if self.current_game_state == "VICTORY":
+            arcade.draw_lrbt_rectangle_filled(0, self.width, 0, self.height,
+                                              (0, 100, 0, 180))
+            arcade.draw_text("ПОБЕДА!", self.width // 2, self.height // 2 + 50,
+                             arcade.color.GOLD, 50, anchor_x="center")
+            arcade.draw_text("ВЫ ПРОШЛИ УРОВЕНЬ 1!", self.width // 2, self.height // 2,
+                             arcade.color.WHITE, 30, anchor_x="center")
+            arcade.draw_text(f"Final Score: {self.player_score}", self.width // 2, self.height // 2 - 40,
+                             arcade.color.YELLOW, 25, anchor_x="center")
+            arcade.draw_text("Возврат в меню...", self.width // 2,
+                             self.height // 2 - 80, arcade.color.YELLOW, 20, anchor_x="center")
+
+    def on_update(self, delta_time):
+        global unlocked_levels, completed_levels
+
+        if self.current_game_state != "PLAYING":
+            # Если победа, разблокируем следующий уровень и отмечаем текущий как пройденный
+            if self.current_game_state == "VICTORY":
+                if self.level_number not in completed_levels:
+                    completed_levels.append(self.level_number)
+                next_level = self.level_number + 1
+                if next_level <= 3 and next_level not in unlocked_levels:
+                    unlocked_levels.append(next_level)
+
+                # Возврат в меню после победы
+                arcade.pause(1.5)
+                self.close()
+                menu = MenuWindow()
+                arcade.run()
+                return
+            return
+
+        # Обновление игрока (ручная физика)
+        if self.main_character.is_active:
+            self.main_character.update(delta_time, self.active_keys)
+            self.main_character.update_animation(delta_time)
+        else:
+            self.current_game_state = "GAME_OVER"
+            if not self.game_over_audio_played:
+                arcade.play_sound(self.defeat_sound)
+                self.game_over_audio_played = True
+            return
+
+        # Пули
+        self.shot_list.update(delta_time)
+
+        # Столкновения пуль с монстрами
+        for projectile in self.shot_list:
+            enemies_hit = arcade.check_for_collision_with_list(projectile, self.enemy_list)
+            if enemies_hit:
+                projectile.remove_from_sprite_lists()
+                for enemy in enemies_hit:
+                    enemy.remove_from_sprite_lists()
+                    self.player_score += 20
+                    self.defeated_enemies += 1
+                    arcade.play_sound(self.impact_sound)
+
+                if self.defeated_enemies >= self.victory_target:
+                    self.current_game_state = "VICTORY"
+                    arcade.play_sound(self.victory_sound)
+
+        # Пули о платформы
+        for projectile in self.shot_list:
+            if arcade.check_for_collision_with_list(projectile, self.obstacle_list):
+                projectile.remove_from_sprite_lists()
+
+        # Монстры
+        for enemy in self.enemy_list:
+            enemy.update(delta_time)
+
+        # Столкновение героя с монстрами (с учётом здоровья)
+        if self.main_character.is_active:
+            if arcade.check_for_collision_with_list(self.main_character, self.enemy_list):
+                self.main_character.is_active = False
+                self.current_game_state = "GAME_OVER"
+
+        # Спавн монстров
+        if self.current_game_state == "PLAYING":
+            self.enemy_spawn_clock += delta_time
+            if self.enemy_spawn_clock >= ENEMY_SPAWN_RATE:
+                new_enemy = EnemyBee(self.main_character)
+                self.enemy_list.append(new_enemy)
+                self.enemy_spawn_clock = 0.0
+
+        # Камера
+        if self.main_character.is_active:
+            target_x = self.main_character.center_x
+            target_y = self.main_character.center_y
+        else:
+            target_x, target_y = self.world_view.position
+
+        current_x, current_y = self.world_view.position
+        smooth_x = current_x + (target_x - current_x) * CAMERA_SMOOTHING
+        smooth_y = current_y + (target_y - current_y) * CAMERA_SMOOTHING
+
+        half_w = self.world_view.viewport_width / 2
+        half_h = self.world_view.viewport_height / 2
+        cam_x = max(half_w, min(MAP_WIDTH - half_w, smooth_x))
+        cam_y = max(half_h, min(MAP_HEIGHT - half_h, smooth_y))
+
+        self.world_view.position = (cam_x, cam_y)
+        self.ui_view.position = (self.width / 2, self.height / 2)
+
+    def on_mouse_press(self, x, y, button, modifiers):
+        if (button == arcade.MOUSE_BUTTON_LEFT and
+                self.current_game_state == "PLAYING" and
+                self.main_character.is_active):
+            cam_x, cam_y = self.world_view.position
+            world_x = cam_x - self.width / 2 + x
+            world_y = cam_y - self.height / 2 + y
+
+            new_shot = Projectile(
+                self.main_character.center_x,
+                self.main_character.center_y,
+                world_x,
+                world_y
+            )
+            self.shot_list.append(new_shot)
+            arcade.play_sound(self.fire_sound)
+
+    def on_key_press(self, key, modifiers):
+        if key == arcade.key.ESCAPE:
+            self.close()
+            menu = MenuWindow()
+            arcade.run()
+            return
+
+        if self.current_game_state == "PLAYING":
+            self.active_keys.add(key)
+
+        if self.current_game_state in ["GAME_OVER", "VICTORY"] and key == arcade.key.R:
+            self.initialize_level()
+
+    def on_key_release(self, key, modifiers):
+        if key in self.active_keys:
+            self.active_keys.remove(key)
