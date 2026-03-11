@@ -1197,18 +1197,17 @@ class GameLevel3(arcade.Window):
             self.active_keys.remove(key)
 
 
-# ----------------------Уровень 2 ------------------------- #
-
 SHIRINA_EKRANA = 1000
 VYSOTA_EKRANA = 600
 ZAGOLOVOK_EKRANA = "Джастин - телепортатор — меню"
+
 SHIRINA_IGRY = 1400
 VYSOTA_IGRY = 750
 
 SHIRINA_MIRA = 3000
 VYSOTA_MIRA = 750
 
-NAZVANIE_UROVNYA2 = "Джастин - телепортатор - Уровень 2"
+NAZVANIE_UROVNYA2 = "Спрайтовый герой - Уровень 2"
 INTERVAL_POYAVLENIYA_MONSTROV = 3.5
 SKOROST_KAMERY = 0.12
 
@@ -1262,6 +1261,7 @@ class Geroy(arcade.Sprite):
         self.vremya_effekta_udara = 0
 
     def obnovit_animaciyu(self, delta_time: float = 1 / 60):
+        # Обновление анимации героя (ходьба/покой, неуязвимость, смерть)
         if not self.zhiv and self.vremya_do_smerti <= 0:
             return
 
@@ -1315,6 +1315,7 @@ class Geroy(arcade.Sprite):
             self.mozhet_prygnut = False
 
     def poluchit_uron(self, uron):
+        # получения урона героем
         if self.vremya_nezashchity <= 0 and self.zhiv and not self.smert_aktivirovana:
             self.zdorovie -= uron
             self.vremya_nezashchity = self.dlitelnost_nezashchity
@@ -1327,6 +1328,7 @@ class Geroy(arcade.Sprite):
         return False
 
 
+#пуля
 class Pulya(arcade.Sprite):
     def __init__(self, start_x, start_y, cel_x, cel_y, skorost=800, uron=10):
         super().__init__()
@@ -1350,7 +1352,7 @@ class Pulya(arcade.Sprite):
         self.center_x += self.change_x * delta_time
         self.center_y += self.change_y * delta_time
 
-
+# монстр
 class LetayushchiyMonstr(arcade.Sprite):
     def __init__(self, igrok):
         super().__init__(":resources:images/enemies/slimePurple.png", scale=0.35)
@@ -1435,6 +1437,7 @@ class LetayushchiyMonstr(arcade.Sprite):
             self.texture = self.texture.flip_horizontally()
 
 
+# (синий слизень) - появляется сверху, прыгает к игроку
 class BystryyMonstr(arcade.Sprite):
     def __init__(self, igrok):
         super().__init__(":resources:images/enemies/slimeBlue.png", scale=0.4)
@@ -1496,12 +1499,14 @@ class BystryyMonstr(arcade.Sprite):
                     self.change_y = 16
                     self.na_zemle = False
 
+            # Движение монстра в сторону игрока по горизонтали
             if rasstoyanie > 5:
                 napravlenie = 1 if raznost_x > 0 else -1
                 dvizhenie = napravlenie * self.skorost * delta_time
                 staraya_x = self.center_x
                 self.center_x += dvizhenie
 
+                # откат позиции если врезался
                 if self.roditel and hasattr(self.roditel, 'spisok_platform'):
                     for platforma in self.roditel.spisok_platform:
                         if arcade.check_for_collision(self, platforma):
@@ -1514,6 +1519,7 @@ class BystryyMonstr(arcade.Sprite):
                     self.texture = self.tekstura_pokoya.flip_horizontally()
 
 
+#звездочка аптечка
 class Aptechka(arcade.Sprite):
     def __init__(self, x, y):
         super().__init__(":resources:images/items/star.png", scale=0.5)
@@ -1528,7 +1534,7 @@ class Aptechka(arcade.Sprite):
         self.vremya += delta_time
         self.center_y += math.sin(self.vremya * self.skorost_parreniya) * self.amplituda_parreniya * delta_time * 30
 
-
+#патрон
 class Patrony(arcade.Sprite):
     def __init__(self, x, y):
         super().__init__(":resources:images/items/gemBlue.png", scale=0.5)
@@ -1542,7 +1548,7 @@ class Patrony(arcade.Sprite):
         self.vremya += delta_time
         self.angle += self.skorost_vrashcheniya * delta_time * 60
 
-
+#финал
 class FlagFinish(arcade.Sprite):
     def __init__(self, x, y):
         super().__init__(":resources:images/items/flagGreen1.png", scale=0.8)
@@ -1652,6 +1658,9 @@ class IgraUroven2(arcade.Window):
 
         self.zvuk_proigrysha_sygra = False
 
+        self.level_number = 2
+
+#Отрисовка всех элементов игры
     def on_draw(self):
         self.clear()
 
@@ -1739,7 +1748,7 @@ class IgraUroven2(arcade.Window):
                              arcade.color.GOLD, 70, anchor_x="center",
                              font_name="Kenney Pixel")
 
-            arcade.draw_text("ФИНИШ ДОСТИГНУТ!",
+            arcade.draw_text("ВЫ ПРОШЛИ УРОВЕНЬ 2!",
                              self.width // 2, self.height // 2 + 50,
                              arcade.color.WHITE, 30, anchor_x="center")
 
@@ -1755,30 +1764,28 @@ class IgraUroven2(arcade.Window):
                              self.width // 2, self.height // 2 - 80,
                              arcade.color.CYAN, 25, anchor_x="center")
 
-            if self.schetchik_ubijstv >= self.tsel_ubijstv:
-                ocenka = "ОТЛИЧНАЯ РАБОТА! ВСЕ МОНСТРЫ УНИЧТОЖЕНЫ!"
-                cvet_ocenki = arcade.color.GOLD
-            elif self.schetchik_ubijstv >= 15:
-                ocenka = "ХОРОШО, НО МОЖНО БЫЛО УБИТЬ БОЛЬШЕ"
-                cvet_ocenki = arcade.color.ORANGE
-            else:
-                ocenka = "ГЛАВНОЕ - ДОБРАТЬСЯ ДО ФИНИША!"
-                cvet_ocenki = arcade.color.GREEN
-
-            arcade.draw_text(ocenka,
+            arcade.draw_text("Возврат в меню...",
                              self.width // 2, self.height // 2 - 120,
-                             cvet_ocenki, 20, anchor_x="center")
-
-            arcade.draw_text("Нажми R чтобы сыграть снова",
-                             self.width // 2, self.height // 2 - 170,
-                             arcade.color.YELLOW, 18, anchor_x="center")
-
-            arcade.draw_text("ESC для выхода в меню",
-                             self.width // 2, self.height // 2 - 200,
-                             arcade.color.ORANGE, 18, anchor_x="center")
+                             arcade.color.YELLOW, 20, anchor_x="center")
 
     def on_update(self, delta_time):
+        global unlocked_levels, completed_levels
+
         if self.sostoyanie_igry != "PLAYING":
+            # Если победа, разблокируем следующий уровень и отмечаем текущий как пройденный
+            if self.sostoyanie_igry == "VICTORY":
+                if self.level_number not in completed_levels:
+                    completed_levels.append(self.level_number)
+                next_level = self.level_number + 1
+                if next_level <= 3 and next_level not in unlocked_levels:
+                    unlocked_levels.append(next_level)
+
+                # Возврат в меню после победы
+                arcade.pause(1.5)
+                self.close()
+                menu = MenuWindow()
+                arcade.run()
+                return
             return
 
         self.vremya_igry += delta_time
@@ -1786,7 +1793,9 @@ class IgraUroven2(arcade.Window):
         self.spisok_flaga.update(delta_time)
 
         self.fizika.update()
-
+        # Обновление состояния героя (движение, анимация, проверка достижения флага)
+        # Если герой мертв - переключение в состояние GAME_OVER
+        # Обновление пуль, аптечек и патронов
         if self.geroy.zhiv or self.geroy.smert_aktivirovana:
             self.geroy.obnovit_skorost(self.nazhatye_klavishi)
             self.geroy.obnovit_animaciyu(delta_time)
@@ -1894,6 +1903,7 @@ class IgraUroven2(arcade.Window):
                 self.spisok_patronov.append(patron)
                 self.taymer_poyavleniya_patronov = 0.0
 
+        #  следование камеры за героем с ограничением по границам мира
         if self.geroy.zhiv or self.geroy.smert_aktivirovana:
             target = (self.geroy.center_x, self.geroy.center_y)
             cx, cy = self.kamera_mira.position
@@ -1908,6 +1918,7 @@ class IgraUroven2(arcade.Window):
             self.kamera_mira.position = (kam_x, kam_y)
             self.kamera_gui.position = (SHIRINA_EKRANA / 2, VYSOTA_EKRANA / 2)
 
+#выстрел левой кнопкой мыши
     def on_mouse_press(self, x, y, knopka, modifikatory):
         if (knopka == arcade.MOUSE_BUTTON_LEFT and
                 self.sostoyanie_igry == "PLAYING" and
@@ -1931,7 +1942,6 @@ class IgraUroven2(arcade.Window):
         if klavisha == arcade.key.ESCAPE:
             self.close()
             menu = MenuWindow()
-            menu.setup()
             arcade.run()
             return
 
@@ -1950,149 +1960,174 @@ class IgraUroven2(arcade.Window):
 
 class MenuWindow(arcade.Window):
     def __init__(self):
-        super().__init__(SHIRINA_EKRANA, VYSOTA_EKRANA, ZAGOLOVOK_EKRANA)
+        super().__init__(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
         arcade.set_background_color(arcade.color.SKY_BLUE)
 
-        self.oblaka = []
-        self.knopki = []
-        self.mx = 0
-        self.my = 0
+        self.clouds = []
+        self.buttons = []
+        self.mouse_x = 0
+        self.mouse_y = 0
 
-        self.sozdat_oblaka()
-        self.sozdat_knopki()
+        self.create_clouds()
+        self.create_buttons()
 
-    def setup(self):
-        pass
-
-    def sozdat_oblaka(self):
+    def create_clouds(self):
         for _ in range(6):
-            self.oblaka.append({
-                "x": random.randint(0, SHIRINA_EKRANA),
+            self.clouds.append({
+                "x": random.randint(0, SCREEN_WIDTH),
                 "y": random.randint(350, 550),
-                "skorost": random.uniform(20, 60)
+                "speed": random.uniform(20, 60)
             })
 
-    def obnovit_oblaka(self, delta_time):
-        for oblako in self.oblaka:
-            oblako["x"] += oblako["skorost"] * delta_time
-            if oblako["x"] > SHIRINA_EKRANA + 150:
-                oblako["x"] = -150
-                oblako["y"] = random.randint(350, 550)
+    def update_clouds(self, delta_time):
+        for cloud in self.clouds:
+            cloud["x"] += cloud["speed"] * delta_time
+            if cloud["x"] > SCREEN_WIDTH + 150:
+                cloud["x"] = -150
+                cloud["y"] = random.randint(350, 550)
 
-    def narisovat_oblako(self, x, y):
+    def draw_cloud(self, x, y):
         arcade.draw_circle_filled(x, y, 40, arcade.color.WHITE)
         arcade.draw_circle_filled(x + 40, y, 50, arcade.color.WHITE)
         arcade.draw_circle_filled(x - 40, y, 50, arcade.color.WHITE)
 
-    def sozdat_knopki(self):
-        urovni = ["1", "2", "3"]
-        shirina_knopki = 260
-        vysota_knopki = 60
-        rasstoyanie = 40
+    #кнопки
+    def create_buttons(self):
+        levels = ["1", "2", "3"]
+        button_width = 260
+        button_height = 60
+        spacing = 40
 
-        obshchaya_shirina = len(urovni) * shirina_knopki + (len(urovni) - 1) * rasstoyanie
-        start_x = (SHIRINA_EKRANA - obshchaya_shirina) // 2 + shirina_knopki // 2
-        centr_y = VYSOTA_EKRANA // 2
+        total_width = len(levels) * button_width + (len(levels) - 1) * spacing
+        start_x = (SCREEN_WIDTH - total_width) // 2 + button_width // 2
+        center_y = SCREEN_HEIGHT // 2
 
-        for i, tekst in enumerate(urovni):
-            centr_x = start_x + i * (shirina_knopki + rasstoyanie)
-            x = centr_x - shirina_knopki // 2
-            y = centr_y - vysota_knopki // 2
+        for i, text in enumerate(levels):
+            center_x = start_x + i * (button_width + spacing)
+            x = center_x - button_width // 2
+            y = center_y - button_height // 2
 
-            self.knopki.append({
-                "tekst": tekst,
-                "uroven": i + 1,
+            self.buttons.append({
+                "text": text,
+                "level": i + 1,
                 "x": x,
                 "y": y,
-                "centr_x": centr_x,
-                "centr_y": centr_y,
-                "shirina": shirina_knopki,
-                "vysota": vysota_knopki
+                "center_x": center_x,
+                "center_y": center_y,
+                "w": button_width,
+                "h": button_height
             })
 
-    def mysh_nad_knopkoy(self, knopka):
+    def is_mouse_over(self, btn):
         return (
-                knopka["x"] < self.mx < knopka["x"] + knopka["shirina"] and
-                knopka["y"] < self.my < knopka["y"] + knopka["vysota"]
+                btn["x"] < self.mouse_x < btn["x"] + btn["w"] and
+                btn["y"] < self.mouse_y < btn["y"] + btn["h"]
         )
 
     def on_draw(self):
+        global unlocked_levels, completed_levels
         self.clear()
-        for oblako in self.oblaka:
-            self.narisovat_oblako(oblako["x"], oblako["y"])
+        for cloud in self.clouds:
+            self.draw_cloud(cloud["x"], cloud["y"])
         arcade.draw_text(
-            "ГЕРОЙ ПРОТИВ МОНСТРОВ",
-            SHIRINA_EKRANA // 2,
-            VYSOTA_EKRANA - 100,
+            "ДЖАСТИН - ТЕЛЕПОРТАТОР",
+            SCREEN_WIDTH // 2,
+            SCREEN_HEIGHT - 100,
             arcade.color.GOLD,
             44,
             anchor_x="center"
         )
 
         arcade.draw_text(
-            "Выберите уровень",
-            SHIRINA_EKRANA // 2,
-            VYSOTA_EKRANA - 160,
+            "Выберите уровень для прохождения",
+            SCREEN_WIDTH // 2,
+            SCREEN_HEIGHT - 160,
             arcade.color.BLUE,
             24,
             anchor_x="center"
         )
 
-        for knopka in self.knopki:
-            navedeno = self.mysh_nad_knopkoy(knopka)
-            cvet = arcade.color.DARK_BLUE if navedeno else arcade.color.BLUE
+        for btn in self.buttons:
+            hovered = self.is_mouse_over(btn)
+            if btn['level'] in completed_levels:
+                # Пройденные уровни — зеленые
+                color = arcade.color.DARK_GREEN if hovered else arcade.color.GREEN
+            elif btn['level'] in unlocked_levels:
+                # Доступные, но не пройденные — синие
+                color = arcade.color.DARK_BLUE if hovered else arcade.color.BLUE
+            else:
+                # Заблокированные — серые
+                color = arcade.color.GRAY if hovered else arcade.color.DARK_GRAY
+
             arcade.draw_lbwh_rectangle_filled(
-                knopka["x"],
-                knopka["y"],
-                knopka["shirina"],
-                knopka["vysota"],
-                cvet
+                btn["x"],
+                btn["y"],
+                btn["w"],
+                btn["h"],
+                color
             )
 
             arcade.draw_lbwh_rectangle_outline(
-                knopka["x"],
-                knopka["y"],
-                knopka["shirina"],
-                knopka["vysota"],
+                btn["x"],
+                btn["y"],
+                btn["w"],
+                btn["h"],
                 arcade.color.WHITE,
                 3
             )
 
             arcade.draw_text(
-                knopka["tekst"],
-                knopka["centr_x"],
-                knopka["centr_y"],
+                btn["text"],
+                btn["center_x"],
+                btn["center_y"],
                 arcade.color.WHITE,
                 22,
                 anchor_x="center",
                 anchor_y="center"
             )
 
+            # галочка для пройденных, замок для заблокированных
+            if btn['level'] in completed_levels:
+                arcade.draw_text("✓", btn["center_x"] + 80, btn["center_y"],
+                                 arcade.color.WHITE, 24, anchor_x="center", anchor_y="center")
+            elif btn['level'] not in unlocked_levels:
+                arcade.draw_text("🔒", btn["center_x"] + 80, btn["center_y"],
+                                 arcade.color.WHITE, 18, anchor_x="center", anchor_y="center")
+
     def on_update(self, delta_time):
-        self.obnovit_oblaka(delta_time)
+        self.update_clouds(delta_time)
 
     def on_mouse_motion(self, x, y, dx, dy):
-        self.mx = x
-        self.my = y
+        self.mouse_x = x
+        self.mouse_y = y
 
-    def on_mouse_press(self, x, y, knopka, modifikatory):
-        for knopka_dannye in self.knopki:
-            if self.mysh_nad_knopkoy(knopka_dannye):
-                print(f"Выбран уровень {knopka_dannye['uroven']} — {knopka_dannye['tekst']}")
-                if knopka_dannye['uroven'] == 1:
-                    print("Уровень 1 в разработке")
-                elif knopka_dannye['uroven'] == 2:
-                    self.close()
-                    igra = IgraUroven2(SHIRINA_IGRY, VYSOTA_IGRY, NAZVANIE_UROVNYA2)
-                    igra.setup()
-                    arcade.run()
+    def on_mouse_press(self, x, y, button, modifiers):
+        global unlocked_levels
+        for btn in self.buttons:
+            if self.is_mouse_over(btn):
+                if btn['level'] in unlocked_levels:
+                    print(f"Выбран уровень {btn['level']} — {btn['text']}")
+                    if btn['level'] == 1:
+                        self.close()
+                        game = GameLevel3(GAME_WIDTH, GAME_HEIGHT, GAME_TITLE)
+                        game.initialize_level()
+                        arcade.run()
+                    elif btn['level'] == 2:
+                        self.close()
+                        game = IgraUroven2(GAME_WIDTH, GAME_HEIGHT, GAME_TITLE)
+                        game.setup()
+                        arcade.run()
+                    elif btn['level'] == 3:
+                        self.close()
+                        game = MyGame(GAME_WIDTH, GAME_HEIGHT, GAME_TITLE)
+                        game.setup()
+                        arcade.run()
                 else:
-                    print(f"Уровень {knopka_dannye['uroven']} в разработке")
+                    print(f"Уровень {btn['level']} заблокирован. Сначала пройдите предыдущий уровень.")
 
 
 def main():
-    okno = MenuWindow()
-    okno.setup()
+    MenuWindow()
     arcade.run()
 
 
