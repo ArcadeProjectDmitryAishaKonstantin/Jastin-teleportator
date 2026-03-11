@@ -27,6 +27,7 @@ class FaceDirection(enum.Enum):
     RIGHT = 1
 
 
+#-------------------Уровень 3----------------------
 class Hero(arcade.Sprite):
     def __init__(self):
         super().__init__()
